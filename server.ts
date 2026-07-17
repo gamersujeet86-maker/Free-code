@@ -1,10 +1,12 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 
 const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), "db.json");
+const isProduction = process.env.NODE_ENV === "production" || 
+  (typeof __filename !== "undefined" && __filename.endsWith(".cjs")) || 
+  !fs.existsSync(path.join(process.cwd(), "server.ts"));
 
 // Define types
 interface User {
@@ -430,7 +432,8 @@ async function startServer() {
 
   // --- VITE MIDDLEWARE SETUP ---
 
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
