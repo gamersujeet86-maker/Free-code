@@ -204,6 +204,51 @@ async function startServer() {
     });
   });
 
+  // Auth: Social Login/Signup (Google, Facebook, Instagram)
+  app.post("/api/auth/social-login", (req, res) => {
+    const { email, provider } = req.body;
+    if (!email) {
+      res.status(400).json({ error: "Social account email is required" });
+      return;
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    if (normalizedEmail === "admin@gmail.com") {
+      res.status(400).json({ error: "Cannot register as admin" });
+      return;
+    }
+
+    const db = loadDb();
+    let user = db.users[normalizedEmail];
+
+    if (!user) {
+      // Auto-register user on first social login
+      user = {
+        id: Math.random().toString(36).substr(2, 9),
+        email: normalizedEmail,
+        passwordHash: `social-auth-${provider || "generic"}`,
+        isAdmin: false,
+        coins: 0,
+        boosterUntil: null,
+        createdAt: new Date().toISOString(),
+      };
+      db.users[normalizedEmail] = user;
+      saveDb(db);
+    }
+
+    res.json({
+      message: `${provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : "Social"} login successful`,
+      token: user.email,
+      user: {
+        id: user.id,
+        email: user.email,
+        isAdmin: user.isAdmin,
+        coins: user.coins,
+        boosterUntil: user.boosterUntil,
+      },
+    });
+  });
+
   // User Profile
   app.get("/api/user/profile", authenticateUser, (req: any, res) => {
     const user = req.user as User;
