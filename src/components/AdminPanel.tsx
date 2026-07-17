@@ -52,7 +52,16 @@ export default function AdminPanel({ token, adminProfile, onLogout }: AdminPanel
       const reqRes = await fetch("/api/admin/requests", {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const reqData = await reqRes.json();
+      
+      let reqData: any = {};
+      const reqContentType = reqRes.headers.get("content-type");
+      if (reqContentType && reqContentType.includes("application/json")) {
+        reqData = await reqRes.json();
+      } else {
+        const text = await reqRes.text();
+        throw new Error(text || `Server returned response status ${reqRes.status}`);
+      }
+
       if (reqRes.ok) {
         setRequests(reqData.requests);
       }
@@ -61,7 +70,16 @@ export default function AdminPanel({ token, adminProfile, onLogout }: AdminPanel
       const userRes = await fetch("/api/admin/users", {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const userData = await userRes.json();
+      
+      let userData: any = {};
+      const userContentType = userRes.headers.get("content-type");
+      if (userContentType && userContentType.includes("application/json")) {
+        userData = await userRes.json();
+      } else {
+        const text = await userRes.text();
+        throw new Error(text || `Server returned response status ${userRes.status}`);
+      }
+
       if (userRes.ok) {
         setUsers(userData.users);
       }
@@ -102,7 +120,15 @@ export default function AdminPanel({ token, adminProfile, onLogout }: AdminPanel
         })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server returned response status ${res.status}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || "Failed to process payout.");
       }
@@ -137,7 +163,15 @@ export default function AdminPanel({ token, adminProfile, onLogout }: AdminPanel
         })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server returned response status ${res.status}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || "Failed to adjust user coins.");
       }

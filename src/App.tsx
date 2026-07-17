@@ -36,10 +36,15 @@ export default function App() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setUserProfile(data.user);
-        setRequests(data.requests);
-        localStorage.setItem("redeem_app_user", JSON.stringify(data.user));
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await response.json();
+          setUserProfile(data.user);
+          setRequests(data.requests);
+          localStorage.setItem("redeem_app_user", JSON.stringify(data.user));
+        } else {
+          console.warn("Profile sync returned non-JSON response");
+        }
       } else {
         // Token might have expired or user was deleted
         handleLogout();

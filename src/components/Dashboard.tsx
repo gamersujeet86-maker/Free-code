@@ -97,14 +97,24 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout }
           "Authorization": `Bearer ${token}`,
         }
       });
-      const data = await response.json();
+      
+      let data: any = {};
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || `Server returned response status ${response.status}`);
+      }
+
       if (response.ok) {
         onRefresh();
       } else {
         alert(data.error || "Failed to sync rewards. Please try again.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Ad reward synchronization error:", err);
+      alert(err.message || "Failed to sync rewards. Please check your network connection.");
     }
   };
 
@@ -138,7 +148,14 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout }
         })
       });
 
-      const data = await response.json();
+      let data: any = {};
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || `Server returned response status ${response.status}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to process redeem request.");
