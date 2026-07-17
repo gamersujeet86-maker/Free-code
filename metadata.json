@@ -1,0 +1,6 @@
+{
+  "name": "Redeem Code Earning App",
+  "description": "Watch ads, earn coins, and redeem them for INR cash or Google Play redeem codes. Features user authentication, coin earning booster, real Google AdSense ad placeholders, and an admin payout dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
