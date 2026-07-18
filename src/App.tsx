@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import AuthScreen from "./components/AuthScreen";
 import Dashboard from "./components/Dashboard";
 import AdminPanel from "./components/AdminPanel";
 import { UserProfile, RedeemRequest } from "./types";
@@ -157,13 +156,20 @@ export default function App() {
     );
   }
 
-  // Not logged in -> Show Authentication Flow
-  if (!token || !userProfile) {
-    return <AuthScreen onLoginSuccess={handleLoginSuccess} />;
-  }
+  // Safe default guest profile if server auto-login is delayed or offline, so user never faces any authorization screens
+  const effectiveProfile: UserProfile = userProfile || {
+    id: "guest",
+    email: "guest@earner.com",
+    isAdmin: false,
+    coins: 0,
+    boosterUntil: null,
+    isBoosterActive: false,
+    boosterTimeRemaining: 0,
+  };
+  const effectiveToken = token || "guest";
 
   // Logged in as Administrator -> Show Admin Panel
-  if (userProfile.isAdmin) {
+  if (effectiveProfile.isAdmin) {
     return (
       <div className="min-h-screen bg-slate-50">
         {/* Top Banner Alert indicating Admin Mode */}
@@ -173,8 +179,8 @@ export default function App() {
         </div>
         
         <AdminPanel
-          token={token}
-          adminProfile={userProfile}
+          token={effectiveToken}
+          adminProfile={effectiveProfile}
           onLogout={handleLogout}
         />
       </div>
@@ -191,8 +197,8 @@ export default function App() {
       </div>
 
       <Dashboard
-        token={token}
-        user={userProfile}
+        token={effectiveToken}
+        user={effectiveProfile}
         requests={requests}
         onRefresh={triggerRefresh}
         onLogout={handleLogout}

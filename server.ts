@@ -105,7 +105,7 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // Helper authentication middleware supporting both header and cookie
+  // Helper authentication middleware supporting both header and cookie - completely hassle-free, no auth blockages
   const authenticateUser = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
     let email: string | null = null;
@@ -117,17 +117,36 @@ async function startServer() {
       email = getCookie(req.headers.cookie, "earn_token");
     }
 
-    if (!email) {
-      res.status(401).json({ error: "Unauthorized access" });
-      return;
+    const db = loadDb();
+    let user: User | null = null;
+
+    if (email) {
+      user = db.users[email.toLowerCase().trim()];
     }
 
-    const db = loadDb();
-    const user = db.users[email.toLowerCase().trim()];
     if (!user) {
-      res.status(401).json({ error: "User not found or session invalid" });
-      return;
+      // Silently and instantly create a fresh user on-the-fly to remove any authorization barrier
+      const id = Math.random().toString(36).substring(2, 11);
+      const anonymousEmail = `user_${id}@earner.com`;
+      user = {
+        id,
+        email: anonymousEmail,
+        passwordHash: `anon-${id}`,
+        isAdmin: false,
+        coins: 0,
+        boosterUntil: null,
+        createdAt: new Date().toISOString(),
+      };
+      db.users[anonymousEmail] = user;
+      saveDb(db);
+
+      // Set cookie so they stay logged into this dynamic anonymous profile
+      res.setHeader(
+        "Set-Cookie",
+        `earn_token=${user.email}; Path=/; Max-Age=${365 * 24 * 60 * 60}; SameSite=Lax; HttpOnly`
+      );
     }
+
     (req as any).user = user;
     next();
   };
