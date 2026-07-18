@@ -88,20 +88,42 @@ function saveDb(db: DatabaseSchema) {
   }
 }
 
+// Cookie Helper
+function getCookie(cookieHeader: string | undefined, name: string): string | null {
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(";");
+  for (const cookie of cookies) {
+    const [key, ...valueParts] = cookie.trim().split("=");
+    if (key === name) {
+      return decodeURIComponent(valueParts.join("="));
+    }
+  }
+  return null;
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // Helper authentication middleware
+  // Helper authentication middleware supporting both header and cookie
   const authenticateUser = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    let email: string | null = null;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      email = authHeader.split(" ")[1];
+    } else {
+      // Fallback to cookie
+      email = getCookie(req.headers.cookie, "earn_token");
+    }
+
+    if (!email) {
       res.status(401).json({ error: "Unauthorized access" });
       return;
     }
-    const email = authHeader.split(" ")[1];
+
     const db = loadDb();
-    const user = db.users[email];
+    const user = db.users[email.toLowerCase().trim()];
     if (!user) {
       res.status(401).json({ error: "User not found or session invalid" });
       return;
@@ -112,13 +134,22 @@ async function startServer() {
 
   const authenticateAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    let email: string | null = null;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      email = authHeader.split(" ")[1];
+    } else {
+      // Fallback to cookie
+      email = getCookie(req.headers.cookie, "earn_token");
+    }
+
+    if (!email) {
       res.status(401).json({ error: "Unauthorized access" });
       return;
     }
-    const email = authHeader.split(" ")[1];
+
     const db = loadDb();
-    const user = db.users[email];
+    const user = db.users[email.toLowerCase().trim()];
     if (!user || !user.isAdmin) {
       res.status(403).json({ error: "Forbidden: Admin access required" });
       return;
@@ -174,7 +205,7 @@ async function startServer() {
     });
   });
 
-  // Auth: Login
+  // Auth: Login (also sets cookie)
   app.post("/api/auth/login", (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -191,9 +222,70 @@ async function startServer() {
       return;
     }
 
+    // Set cookie
+    res.setHeader(
+      "Set-Cookie",
+      `earn_token=${user.email}; Path=/; Max-Age=${365 * 24 * 60 * 60}; SameSite=Lax; HttpOnly`
+    );
+
     res.json({
       message: "Login successful",
       token: user.email, // Simple token implementation
+      user: {
+        id: user.id,
+        email: user.email,
+        isAdmin: user.isAdmin,
+        coins: user.coins,
+        boosterUntil: user.boosterUntil,
+      },
+    });
+  });
+
+  // Auth: Auto-login
+  app.post("/api/auth/auto-login", (req, res) => {
+    const db = loadDb();
+    
+    // Try to read from cookie 'earn_token'
+    let email = getCookie(req.headers.cookie, "earn_token");
+    
+    // Fallback to body token if any
+    if (!email && req.body.token) {
+      email = req.body.token;
+    }
+    
+    let user: User | null = null;
+    
+    if (email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      user = db.users[normalizedEmail] || null;
+    }
+    
+    if (!user) {
+      // Create fresh anonymous user
+      const id = Math.random().toString(36).substring(2, 11);
+      const anonymousEmail = `user_${id}@earner.com`;
+      user = {
+        id,
+        email: anonymousEmail,
+        passwordHash: `anon-${id}`,
+        isAdmin: false,
+        coins: 0,
+        boosterUntil: null,
+        createdAt: new Date().toISOString(),
+      };
+      db.users[anonymousEmail] = user;
+      saveDb(db);
+    }
+    
+    // Set/renew cookie
+    res.setHeader(
+      "Set-Cookie",
+      `earn_token=${user.email}; Path=/; Max-Age=${365 * 24 * 60 * 60}; SameSite=Lax; HttpOnly`
+    );
+    
+    res.json({
+      message: "Auto-login successful",
+      token: user.email,
       user: {
         id: user.id,
         email: user.email,

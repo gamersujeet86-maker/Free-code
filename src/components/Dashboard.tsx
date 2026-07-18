@@ -30,9 +30,10 @@ interface DashboardProps {
   requests: RedeemRequest[];
   onRefresh: () => void;
   onLogout: () => void;
+  onAdminLogin?: (token: string, user: any) => void;
 }
 
-export default function Dashboard({ token, user, requests, onRefresh, onLogout }: DashboardProps) {
+export default function Dashboard({ token, user, requests, onRefresh, onLogout, onAdminLogin }: DashboardProps) {
   const [adModalOpen, setAdModalOpen] = useState(false);
   const [adModalType, setAdModalType] = useState<"reward" | "booster">("reward");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -41,6 +42,13 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout }
   const [submittingRedeem, setSubmittingRedeem] = useState(false);
   const [redeemError, setRedeemError] = useState<string | null>(null);
   const [redeemSuccess, setRedeemSuccess] = useState<string | null>(null);
+
+  // Admin login states
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
+  const [loggingInAdmin, setLoggingInAdmin] = useState(false);
 
   // Time remaining countdown in seconds
   const [boosterTimeStr, setBoosterTimeStr] = useState("00:00");
@@ -172,6 +180,42 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout }
     }
   };
 
+  const handleAdminLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminLoginError(null);
+    setLoggingInAdmin(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: adminEmail,
+          password: adminPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Invalid administrator credentials.");
+      }
+
+      if (onAdminLogin) {
+        onAdminLogin(data.token, data.user);
+      }
+      setAdminLoginOpen(false);
+      setAdminEmail("");
+      setAdminPassword("");
+    } catch (err: any) {
+      setAdminLoginError(err.message || "An unexpected error occurred during admin login.");
+    } finally {
+      setLoggingInAdmin(false);
+    }
+  };
+
   const scrollToRedeem = () => {
     if (redeemSectionRef.current) {
       redeemSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -223,13 +267,22 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout }
             <RefreshCw size={13} className="animate-spin text-slate-400" />
             <span>Sync Data</span>
           </button>
+
+          <button
+            onClick={() => setAdminLoginOpen(true)}
+            className="flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-4 py-2.5 rounded-xl font-bold transition border border-indigo-100/50"
+          >
+            <Lock size={13} />
+            <span>Admin Portal</span>
+          </button>
           
           <button
             onClick={onLogout}
             className="flex items-center gap-2 text-xs bg-rose-50 text-rose-600 hover:bg-rose-100 px-4 py-2.5 rounded-xl font-bold transition"
+            title="Reset Session and create a fresh new account"
           >
             <LogOut size={14} />
-            <span>Sign Out</span>
+            <span>Reset Session</span>
           </button>
         </div>
       </header>
@@ -751,6 +804,73 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout }
         onReward={handleAdFinished}
         adType={adModalType}
       />
+
+      {/* Admin Login Modal Overlay */}
+      {adminLoginOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Lock size={16} />
+                </div>
+                <h3 className="font-bold text-slate-900">Admin Authorization Portal</h3>
+              </div>
+              <button 
+                onClick={() => { setAdminLoginOpen(false); setAdminLoginError(null); }}
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none p-1"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
+              {adminLoginError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-xs font-medium flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>{adminLoginError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Admin Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="admin@gmail.com"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Security Passcode
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter administrator password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loggingInAdmin}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-xs py-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10"
+              >
+                {loggingInAdmin ? "Authorizing Security..." : "Authorize & Enter Admin Panel"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

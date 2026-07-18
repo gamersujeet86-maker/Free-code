@@ -12,16 +12,51 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Check for saved session on load
+  // Check for saved session or trigger auto-login on load
   useEffect(() => {
-    const savedToken = localStorage.getItem("redeem_app_token");
-    const savedUser = localStorage.getItem("redeem_app_user");
+    const initSession = async () => {
+      const savedToken = localStorage.getItem("redeem_app_token");
+      const savedUser = localStorage.getItem("redeem_app_user");
 
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUserProfile(JSON.parse(savedUser));
-    }
-    setLoading(false);
+      if (savedToken && savedUser) {
+        setToken(savedToken);
+        setUserProfile(JSON.parse(savedUser));
+        setLoading(false);
+        return;
+      }
+
+      // No saved token, or we need to fetch/create an auto-login session
+      try {
+        const response = await fetch("/api/auth/auto-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token: savedToken }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          localStorage.setItem("redeem_app_token", data.token);
+          const initialProfile: UserProfile = {
+            ...data.user,
+            isBoosterActive: false,
+            boosterTimeRemaining: 0,
+          };
+          localStorage.setItem("redeem_app_user", JSON.stringify(initialProfile));
+          setToken(data.token);
+          setUserProfile(initialProfile);
+        } else {
+          console.error("Auto-login returned non-ok status");
+        }
+      } catch (err) {
+        console.error("Connection failed during automatic login:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initSession();
   }, []);
 
   // Fetch updated user profile & requests from backend
@@ -46,7 +81,7 @@ export default function App() {
           console.warn("Profile sync returned non-JSON response");
         }
       } else {
-        // Token might have expired or user was deleted
+        // If profile fetch fails (e.g., unauthorized/deleted), do auto-login reset
         handleLogout();
       }
     } catch (error) {
@@ -74,14 +109,14 @@ export default function App() {
 
   const handleLoginSuccess = (
     authToken: string,
-    profile: { id: string; email: string; isAdmin: boolean }
+    profile: { id: string; email: string; isAdmin: boolean; coins?: number; boosterUntil?: number | null }
   ) => {
     localStorage.setItem("redeem_app_token", authToken);
     // Create preliminary user state
     const initialProfile: UserProfile = {
       ...profile,
-      coins: 0,
-      boosterUntil: null,
+      coins: profile.coins ?? 0,
+      boosterUntil: profile.boosterUntil ?? null,
       isBoosterActive: false,
       boosterTimeRemaining: 0,
     };
@@ -94,9 +129,13 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem("redeem_app_token");
     localStorage.removeItem("redeem_app_user");
+    // Clear cookies
+    document.cookie = "earn_token=; path=/; max-age=0;";
     setToken(null);
     setUserProfile(null);
     setRequests([]);
+    // Reload to trigger automatic clean anonymous account generation
+    window.location.reload();
   };
 
   const triggerRefresh = () => {
@@ -157,6 +196,7 @@ export default function App() {
         requests={requests}
         onRefresh={triggerRefresh}
         onLogout={handleLogout}
+        onAdminLogin={handleLoginSuccess}
       />
     </div>
   );
