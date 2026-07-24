@@ -193,7 +193,7 @@ export default function App() {
       {/* Top Welcome Alert Banner */}
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-4 py-2 text-center text-xs font-semibold flex items-center justify-center gap-2">
         <Sparkles size={14} className="text-amber-400 animate-bounce" />
-        <span>Watch Sponsor Video Ads to claim real Google Play Codes & Paytm Cash!</span>
+        <span>Complete 10-second tasks & claim real Google Play Codes & Paytm Cash!</span>
       </div>
 
       <Dashboard

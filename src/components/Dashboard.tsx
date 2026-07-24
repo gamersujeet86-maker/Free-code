@@ -1,28 +1,27 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Coins, 
-  Clock, 
   Sparkles, 
-  TrendingUp, 
   LogOut, 
   Gift, 
   CheckCircle2, 
   AlertCircle, 
   Copy, 
   Check, 
-  CreditCard,
   Send,
-  HelpCircle,
-  PlayCircle,
   Lock,
-  Unlock,
   ChevronRight,
-  Info,
-  RefreshCw
+  RefreshCw,
+  Menu,
+  X,
+  Trophy,
+  Home,
+  FileText,
+  Zap,
+  ExternalLink
 } from "lucide-react";
 import { UserProfile, RedeemRequest, REDEEM_PACKAGES, RedeemPackage } from "../types";
 import AdSimulator from "./AdSimulator";
-import AdSenseUnit from "./AdSenseUnit";
 
 interface DashboardProps {
   token: string;
@@ -34,6 +33,9 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ token, user, requests, onRefresh, onLogout, onAdminLogin }: DashboardProps) {
+  const [activeTab, setActiveTab] = useState<"home" | "leaderboard" | "withdraw" | "history">("home");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const [adModalOpen, setAdModalOpen] = useState(false);
   const [adModalType, setAdModalType] = useState<"reward" | "booster">("reward");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -51,9 +53,28 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
   const [loggingInAdmin, setLoggingInAdmin] = useState(false);
 
-  // Time remaining countdown in seconds
+  // Time remaining countdown for booster
   const [boosterTimeStr, setBoosterTimeStr] = useState("00:00");
-  const redeemSectionRef = useRef<HTMLDivElement | null>(null);
+
+  // Leaderboard state
+  const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Fetch leaderboard data
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await fetch("/api/leaderboard");
+        if (res.ok) {
+          const data = await res.json();
+          setLeaderboardUsers(data.users || []);
+        }
+      } catch (e) {
+        console.error("Failed to fetch leaderboard:", e);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [user.coins]);
 
   useEffect(() => {
     if (!user.boosterUntil) {
@@ -67,7 +88,7 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
       if (diff <= 0) {
         setBoosterTimeStr("00:00");
         clearInterval(interval);
-        onRefresh(); // Trigger profile reload to deactivate booster
+        onRefresh();
       } else {
         const minutes = Math.floor(diff / 60000);
         const seconds = Math.floor((diff % 60000) / 1000);
@@ -86,12 +107,12 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleOpenAd = (type: "reward" | "booster") => {
+  const handleOpenTask = (type: "reward" | "booster") => {
     setAdModalType(type);
     setAdModalOpen(true);
   };
 
-  const handleAdFinished = async () => {
+  const handleTaskFinished = async () => {
     setAdModalOpen(false);
     
     const endpoint = adModalType === "reward" 
@@ -122,7 +143,7 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
           const newCoins = data.newCoins ?? (user.coins + earned);
           setRewardToast(`🎉 +${earned} Coins credited! New balance: ${newCoins.toLocaleString()} coins.`);
         } else {
-          setRewardToast("🚀 2X Coin Booster activated! You now earn double coins for 15 minutes.");
+          setRewardToast("🚀 2X Coin Booster activated! Double coins for 15 minutes.");
         }
         setTimeout(() => setRewardToast(null), 6000);
         onRefresh();
@@ -130,8 +151,8 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
         alert(data.error || "Failed to sync rewards. Please try again.");
       }
     } catch (err: any) {
-      console.error("Ad reward synchronization error:", err);
-      alert(err.message || "Failed to sync rewards. Please check your network connection.");
+      console.error("Task reward sync error:", err);
+      alert(err.message || "Failed to sync rewards. Please check your connection.");
     }
   };
 
@@ -225,17 +246,9 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
     }
   };
 
-  const scrollToRedeem = () => {
-    if (redeemSectionRef.current) {
-      redeemSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
-
-  // Calculate current progress width based on max milestone coins (19,500)
   const maxMilestoneCoins = 19500;
   const progressPercentage = Math.min((user.coins / maxMilestoneCoins) * 100, 100);
 
-  // Find next milestone and remaining coins
   const milestones = [
     { name: "10 INR", coins: 2500, value: 10 },
     { name: "20 INR", coins: 4000, value: 20 },
@@ -244,14 +257,29 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
   ];
 
   const nextMilestone = milestones.find(m => user.coins < m.coins) || null;
-  const activeMilestonesCount = milestones.filter(m => user.coins >= m.coins).length;
+
+  // Default leaderboard users
+  const defaultLeaderboard = [
+    { rank: 1, email: "rahul.k****@gmail.com", coins: 45200, totalPaid: "200 INR" },
+    { rank: 2, email: "sumit_earner****@gmail.com", coins: 38900, totalPaid: "150 INR" },
+    { rank: 3, email: "priya_earn****@gmail.com", coins: 31000, totalPaid: "120 INR" },
+    { rank: 4, email: "gamersujeet****@gmail.com", coins: 28500, totalPaid: "100 INR" },
+    { rank: 5, email: "vikas_play****@gmail.com", coins: 22400, totalPaid: "80 INR" },
+    { rank: 6, email: "deepak_pro****@gmail.com", coins: 19800, totalPaid: "70 INR" },
+    { rank: 7, email: "ananya_free****@gmail.com", coins: 16500, totalPaid: "50 INR" },
+    { rank: 8, email: "rohit_coder****@gmail.com", coins: 14200, totalPaid: "50 INR" },
+    { rank: 9, email: "manish_win****@gmail.com", coins: 11900, totalPaid: "30 INR" },
+    { rank: 10, email: "karan_app****@gmail.com", coins: 10500, totalPaid: "20 INR" },
+  ];
+
+  const displayLeaderboard = leaderboardUsers.length > 0 ? leaderboardUsers : defaultLeaderboard;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 font-sans">
+    <div className="max-w-6xl mx-auto px-4 py-6 font-sans pb-24">
       
       {/* Toast Notification Banner */}
       {rewardToast && (
-        <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl shadow-lg border border-emerald-400 flex items-center justify-between animate-in fade-in slide-in-from-top-3 duration-300">
+        <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl shadow-lg border border-emerald-400 flex items-center justify-between animate-in fade-in slide-in-from-top-3 duration-300 z-30">
           <div className="flex items-center gap-3">
             <Sparkles size={20} className="animate-spin text-amber-200 shrink-0" />
             <span className="text-xs sm:text-sm font-black font-display tracking-wide">{rewardToast}</span>
@@ -265,248 +293,295 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
         </div>
       )}
 
-      {/* Navigation Top Bar */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-8">
+      {/* Navigation Top Header with 3-Line Hamburger Menu on Top Left */}
+      <header className="flex items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-100 shadow-sm mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-inner">
-            <Coins className="text-indigo-600 animate-pulse" size={24} />
-          </div>
-          <div>
-            <h2 className="text-xl font-black text-slate-950 font-display tracking-tight flex items-center gap-2">
-              <span>Fast Earn Dashboard</span>
-              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-500/15">
-                ● LIVE
-              </span>
-            </h2>
-            <p className="text-xs text-slate-400 font-mono">
-              Account: <span className="text-slate-600 font-semibold">{user.email}</span>
-            </p>
+          {/* Hamburger Menu 3 Line Button */}
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="w-11 h-11 rounded-2xl bg-slate-900 text-white hover:bg-indigo-600 flex items-center justify-center transition shadow-md active:scale-95 shrink-0"
+            title="Toggle Navigation Menu"
+          >
+            {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-inner">
+              <Coins className="text-indigo-600 animate-pulse" size={22} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-950 font-display tracking-tight flex items-center gap-1.5">
+                <span>Fast Earn</span>
+                <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-500/15">
+                  LIVE
+                </span>
+              </h2>
+              <p className="text-[11px] text-slate-400 font-mono truncate max-w-[140px] sm:max-w-xs">
+                {user.email}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-end sm:self-center">
-          <button
-            onClick={onRefresh}
-            className="text-xs bg-slate-50 hover:bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-1.5 border border-slate-100"
-          >
-            <RefreshCw size={13} className="animate-spin text-slate-400" />
-            <span>Sync Data</span>
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Quick Coin Balance Badge */}
+          <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 px-3 py-2 rounded-2xl font-black text-xs flex items-center gap-1.5 shadow-sm">
+            <Coins size={15} />
+            <span>{user.coins.toLocaleString()}</span>
+          </div>
 
           <button
-            onClick={() => setAdminLoginOpen(true)}
-            className="flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-4 py-2.5 rounded-xl font-bold transition border border-indigo-100/50"
+            onClick={onRefresh}
+            className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl border border-slate-100 transition"
+            title="Sync Data"
           >
-            <Lock size={13} />
-            <span>Admin Portal</span>
-          </button>
-          
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-2 text-xs bg-rose-50 text-rose-600 hover:bg-rose-100 px-4 py-2.5 rounded-xl font-bold transition"
-            title="Reset Session and create a fresh new account"
-          >
-            <LogOut size={14} />
-            <span>Reset Session</span>
+            <RefreshCw size={15} />
           </button>
         </div>
       </header>
 
-      {/* FANTASTIC NEW SECTION: Interactive Balance & Redemption Milestone Progress Track */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl mb-8 relative overflow-hidden border border-slate-800">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/80">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-indigo-500/30">
-                Live Earnings Line
-              </span>
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-amber-500/30 flex items-center gap-1">
-                <Sparkles size={10} />
-                Pub-9048277633959630
-              </span>
-            </div>
-            <h3 className="text-3xl font-black font-display tracking-tight text-white flex items-center gap-2">
-              <span>{user.coins.toLocaleString()}</span>
-              <span className="text-sm font-semibold text-slate-400 font-mono">Coins Accumulated</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-              <Info size={13} className="text-indigo-400 shrink-0" />
-              <span>
-                Estimated Value: <strong className="text-emerald-400 font-bold">₹{((user.coins / 2500) * 10).toFixed(2)} INR</strong>. 
-                {nextMilestone ? (
-                  <> Need <strong className="text-amber-400">{(nextMilestone.coins - user.coins).toLocaleString()}</strong> more to withdraw {nextMilestone.name}.</>
-                ) : (
-                  <> You have achieved all withdrawal milestones! Request payout below.</>
-                )}
-              </span>
-            </p>
-          </div>
+      {/* Slide-out Navigation Drawer Menu */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div 
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMenuOpen(false)}
+          />
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => handleOpenAd("reward")}
-              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 transition transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-amber-500/10 shrink-0"
-            >
-              <PlayCircle size={15} />
-              <span>Watch Video Ad (+10 Coins)</span>
-            </button>
+          <div className="relative w-80 max-w-[80vw] bg-slate-900 text-white h-full shadow-2xl p-6 flex flex-col justify-between z-10 animate-in slide-in-from-left duration-200">
+            <div>
+              <div className="flex items-center justify-between pb-6 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white">
+                    <Coins size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-base font-display">Fast Earn App</h3>
+                    <p className="text-xs text-slate-400 font-mono">Navigation Menu</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
-            <button
-              onClick={scrollToRedeem}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 transition transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-indigo-600/10 shrink-0"
-            >
-              <Gift size={15} />
-              <span>Go to Withdrawal Box</span>
-            </button>
-          </div>
-        </div>
+              {/* Drawer User Info Card */}
+              <div className="mt-6 bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Current Balance</span>
+                  <span className="text-emerald-400 font-bold font-mono">₹{((user.coins / 2500) * 10).toFixed(2)}</span>
+                </div>
+                <div className="text-xl font-black font-display text-amber-400 flex items-center gap-1.5">
+                  <Coins size={20} />
+                  <span>{user.coins.toLocaleString()} Coins</span>
+                </div>
+              </div>
 
-        {/* Milestone Tick Line Layout */}
-        <div className="mt-8 relative">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-3 font-mono font-bold">
-            <span>Progress to ₹100 INR Limit</span>
-            <span className="text-amber-400">{progressPercentage.toFixed(1)}% Completed</span>
-          </div>
-
-          {/* Progress track */}
-          <div className="relative h-4 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-            {/* Active filled line */}
-            <div 
-              className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(99,102,241,0.5)]"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-
-          {/* Interactive Tick Marks */}
-          <div className="grid grid-cols-4 gap-2 mt-4 relative">
-            {milestones.map((milestone, idx) => {
-              const isUnlocked = user.coins >= milestone.coins;
-              return (
-                <div 
-                  key={idx}
-                  onClick={() => {
-                    if (isUnlocked) {
-                      const pkg = REDEEM_PACKAGES.find(p => p.amount === milestone.value);
-                      if (pkg) {
-                        setSelectedPackage(pkg);
-                        scrollToRedeem();
-                      }
-                    }
-                  }}
-                  className={`flex flex-col p-3 rounded-2xl border transition-all cursor-pointer ${
-                    isUnlocked 
-                      ? "bg-slate-900/80 border-emerald-500/30 hover:border-emerald-500 text-white" 
-                      : "bg-slate-950/40 border-slate-800 text-slate-500 hover:border-slate-700"
+              {/* Navigation Links */}
+              <nav className="mt-8 space-y-2">
+                <button
+                  onClick={() => { setActiveTab("home"); setIsMenuOpen(false); }}
+                  className={`w-full p-3.5 rounded-2xl font-bold text-xs flex items-center gap-3 transition ${
+                    activeTab === "home"
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+                      : "text-slate-300 hover:bg-slate-800"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider font-display">
-                      ₹{milestone.value} INR
-                    </span>
-                    {isUnlocked ? (
-                      <Unlock size={11} className="text-emerald-400 shrink-0" />
-                    ) : (
-                      <Lock size={11} className="text-slate-600 shrink-0" />
-                    )}
+                  <Home size={18} />
+                  <span>Home Dashboard</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("leaderboard"); setIsMenuOpen(false); }}
+                  className={`w-full p-3.5 rounded-2xl font-bold text-xs flex items-center gap-3 transition ${
+                    activeTab === "leaderboard"
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+                      : "text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  <Trophy size={18} />
+                  <span>Leaderboard</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("withdraw"); setIsMenuOpen(false); }}
+                  className={`w-full p-3.5 rounded-2xl font-bold text-xs flex items-center gap-3 transition ${
+                    activeTab === "withdraw"
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+                      : "text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  <Gift size={18} />
+                  <span>Withdraw Zone</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("history"); setIsMenuOpen(false); }}
+                  className={`w-full p-3.5 rounded-2xl font-bold text-xs flex items-center gap-3 transition ${
+                    activeTab === "history"
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+                      : "text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  <FileText size={18} />
+                  <span>History</span>
+                </button>
+
+                <a
+                  href="https://omg10.com/4/11383535"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full p-3.5 rounded-2xl font-bold text-xs flex items-center justify-between bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Sparkles size={18} className="text-amber-400" />
+                    <span>Special Sponsor Offer</span>
                   </div>
-                  <span className="text-xs font-black text-slate-100 mt-0.5">
-                    {milestone.coins.toLocaleString()} <span className="text-[9px] font-normal text-slate-400 font-sans">coins</span>
-                  </span>
-                  
-                  <div className="mt-2 flex items-center justify-between text-[9px] font-semibold">
-                    <span className={isUnlocked ? "text-emerald-400" : "text-slate-500"}>
-                      {isUnlocked ? "Ready to Withdraw" : "Locked"}
-                    </span>
-                    {isUnlocked && <ChevronRight size={10} className="text-slate-400" />}
-                  </div>
-                </div>
-              );
-            })}
+                  <ExternalLink size={14} className="text-amber-400 group-hover:translate-x-0.5 transition" />
+                </a>
+              </nav>
+            </div>
+
+            {/* Bottom Actions in Drawer */}
+            <div className="pt-6 border-t border-slate-800 space-y-2">
+              <button
+                onClick={() => { setIsMenuOpen(false); setAdminLoginOpen(true); }}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-indigo-300 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition"
+              >
+                <Lock size={14} />
+                <span>Admin Portal</span>
+              </button>
+
+              <button
+                onClick={onLogout}
+                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition"
+              >
+                <LogOut size={14} />
+                <span>Reset Session</span>
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Informative Explanation of Earning Flow */}
-        <div className="mt-6 bg-indigo-950/40 border border-indigo-500/10 p-4 rounded-2xl flex items-start gap-3">
-          <HelpCircle size={18} className="text-indigo-400 shrink-0 mt-0.5" />
-          <div className="text-xs text-slate-300 leading-relaxed">
-            <strong className="text-white">How do I earn real cash?</strong> When you watch video advertisements, our systems deliver traffic to Google AdSense partner code <strong>pub-9048277633959630</strong>. This pays actual revenue into the reserve pool. That's why we can hand over real manual Paytm cash, UPI payouts, and Google Play Redeem Codes. Keep watching and claiming!
-          </div>
-        </div>
-
-      </div>
-
-      {/* Main Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Column 1 & 2: Main Console */}
-        <div className="lg:col-span-2 space-y-8">
+      {/* Main Tab Content Display */}
+      {activeTab === "home" && (
+        <div className="space-y-8 animate-in fade-in duration-200">
           
-          {/* Quick Stats Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Real Balance Info Card */}
-            <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-800 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10">
-                <Coins size={150} />
+          {/* Main Hero Card */}
+          <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden border border-slate-800">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/80">
+              <div>
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-indigo-500/30 inline-block mb-3">
+                  Live Coin Balance
+                </span>
+                <h3 className="text-3xl font-black font-display tracking-tight text-white flex items-center gap-2">
+                  <span>{user.coins.toLocaleString()}</span>
+                  <span className="text-sm font-semibold text-slate-400 font-mono">Coins</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-2">
+                  Estimated Cash Value: <strong className="text-emerald-400 font-bold">₹{((user.coins / 2500) * 10).toFixed(2)} INR</strong>
+                  {nextMilestone && (
+                    <> • Need <strong className="text-amber-400">{(nextMilestone.coins - user.coins).toLocaleString()}</strong> more coins for {nextMilestone.name}</>
+                  )}
+                </p>
               </div>
-              <div className="relative z-10 flex flex-col justify-between h-full">
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-200">
-                    Your Spendable Balance
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-4xl font-extrabold tracking-tight font-display">
-                      {user.coins.toLocaleString()}
-                    </span>
-                    <span className="text-xs text-indigo-200 font-mono">coins</span>
-                  </div>
-                </div>
 
-                <div className="mt-6 pt-4 border-t border-indigo-500/50 flex items-center justify-between text-xs text-indigo-100">
-                  <span>Available Cash Value:</span>
-                  <strong className="text-emerald-300 font-bold text-sm font-mono">₹{((user.coins / 2500) * 10).toFixed(2)} INR</strong>
-                </div>
+              {/* Main "Get Coins" Action Button */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => handleOpenTask("reward")}
+                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-black text-xs px-7 py-4 rounded-2xl flex items-center justify-center gap-2.5 transition transform hover:scale-[1.02] active:scale-95 shadow-xl shadow-emerald-500/20 shrink-0 cursor-pointer"
+                >
+                  <Coins size={18} className="text-amber-300 animate-bounce" />
+                  <span>Get Coins (+10 Coins)</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("withdraw")}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-6 py-4 rounded-2xl flex items-center justify-center gap-2 transition transform hover:scale-[1.02] active:scale-95 shadow-xl shadow-indigo-600/20 shrink-0 cursor-pointer"
+                >
+                  <Gift size={16} />
+                  <span>Withdraw Coins</span>
+                </button>
               </div>
             </div>
 
-            {/* Booster Card */}
-            <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+            {/* Progress Bar to Milestone */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-mono font-bold">
+                <span>Progress to ₹100 INR Limit</span>
+                <span className="text-amber-400">{progressPercentage.toFixed(1)}%</span>
+              </div>
+              <div className="h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                <div 
+                  className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-700 shadow-sm"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats & Booster */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            {/* Get Coins Card Zone */}
+            <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:border-indigo-100 transition">
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                    2x Coin Booster Status
-                  </span>
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
+                  <Coins size={22} />
+                </div>
+                <h4 className="text-base font-black text-slate-900 font-display">Fast Coin Task</h4>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                  Complete the 10-second timer and scroll task to receive {user.isBoosterActive ? <strong className="text-emerald-600">20 Coins (2x Multiplier)</strong> : <strong>10 Coins</strong>}.
+                </p>
+              </div>
+
+              <button
+                onClick={() => handleOpenTask("reward")}
+                className="mt-6 w-full bg-slate-900 hover:bg-indigo-600 text-white text-xs font-black py-3.5 rounded-2xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles size={14} className="text-amber-400" />
+                <span>Get Coins Now</span>
+              </button>
+            </div>
+
+            {/* 2x Booster Card Zone */}
+            <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:border-amber-100 transition">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <Zap size={22} />
+                  </div>
                   {user.isBoosterActive ? (
-                    <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                      <Sparkles size={10} className="animate-spin" />
-                      Active
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 rounded-full font-bold flex items-center gap-1">
+                      <Sparkles size={10} className="animate-spin text-amber-500" />
+                      Active 2x Multiplier
                     </span>
                   ) : (
-                    <span className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full font-semibold">
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-bold">
                       Inactive
                     </span>
                   )}
                 </div>
 
                 {user.isBoosterActive ? (
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold text-slate-900 font-display">
+                  <div>
+                    <span className="text-2xl font-black text-slate-900 font-display">
                       {boosterTimeStr}
                     </span>
                     <p className="text-xs text-slate-500 mt-1">
-                      You are earning <strong className="text-indigo-600">20 coins</strong> per ad instead of 10!
+                      Double coin boost active! You earn <strong>20 coins</strong> per task!
                     </p>
                   </div>
                 ) : (
-                  <div className="mt-3">
-                    <span className="text-sm font-medium text-slate-700 block">
-                      No Booster Active
-                    </span>
-                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Watch a premium booster ad to unlock double coin payouts on all actions for 15 minutes!
+                  <div>
+                    <h4 className="text-base font-black text-slate-900 font-display">2x Coin Multiplier</h4>
+                    <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                      Complete a 10s task to activate double coins on all future claims for 15 minutes!
                     </p>
                   </div>
                 )}
@@ -514,83 +589,166 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
 
               {!user.isBoosterActive && (
                 <button
-                  onClick={() => handleOpenAd("booster")}
-                  className="mt-4 w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-amber-100 hover:shadow-amber-200 active:scale-95"
+                  onClick={() => handleOpenTask("booster")}
+                  className="mt-6 w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs py-3.5 rounded-2xl transition shadow-md shadow-amber-500/10 flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Sparkles size={12} />
-                  <span>Activate 2x Booster Now</span>
+                  <Zap size={14} />
+                  <span>Activate 2x Multiplier</span>
                 </button>
               )}
             </div>
+
           </div>
 
-          {/* Earning Area */}
-          <section className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-            <h3 className="text-base font-bold text-slate-900 font-display tracking-tight mb-2 flex items-center gap-2">
-              <TrendingUp size={18} className="text-indigo-600" />
-              <span>Sponsor Video Earning Zone</span>
-            </h3>
-            <p className="text-xs text-slate-500 mb-6">
-              Watch official advertisement media to claim rewards. No daily limit—enjoy continuous credits!
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Std Ad Button */}
-              <div className="border border-slate-100 rounded-2xl p-5 hover:border-indigo-100 hover:bg-indigo-50/20 transition group flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
-                    <Coins size={18} />
-                  </div>
-                  <h4 className="text-sm font-semibold text-slate-900">Standard Advertisement</h4>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Watch a 15s advertisement to claim {user.isBoosterActive ? <span className="text-emerald-600 font-bold">20 Coins (2x)</span> : <span className="text-slate-600 font-bold">10 Coins</span>}.
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleOpenAd("reward")}
-                  className="mt-4 w-full bg-slate-900 text-white hover:bg-indigo-600 text-xs font-semibold py-2.5 rounded-xl transition"
-                >
-                  Watch Ad & Claim Coins
-                </button>
-              </div>
-
-              {/* Booster Ad Button */}
-              <div className="border border-slate-100 rounded-2xl p-5 hover:border-amber-100 hover:bg-amber-50/20 transition group flex flex-col justify-between">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
-                    <Sparkles size={18} className="group-hover:animate-bounce" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-slate-900">Premium Booster Ad</h4>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Watch a specialized sponsor ad to claim or extend your 2x earning multiplier (+15 mins).
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleOpenAd("booster")}
-                  className="mt-4 w-full bg-amber-500 text-white hover:bg-amber-600 text-xs font-semibold py-2.5 rounded-xl transition shadow-sm shadow-amber-50"
-                >
-                  Watch & Trigger 2x Boost
-                </button>
-              </div>
+          {/* Featured Sponsor Offer Direct Link Banner */}
+          <div className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 rounded-3xl p-6 text-slate-950 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-amber-400">
+            <div>
+              <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2.5 py-1 rounded-full uppercase tracking-wider inline-block mb-1.5">
+                🔥 Featured Sponsor Offer
+              </span>
+              <h4 className="text-base font-black font-display text-slate-950">
+                Explore Direct Partner Offer
+              </h4>
+              <p className="text-xs font-medium text-slate-900 mt-0.5">
+                Click below to open our verified sponsor deal in a new tab!
+              </p>
             </div>
-          </section>
 
-          {/* Redemption Area */}
-          <section ref={redeemSectionRef} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm scroll-mt-6">
+            <a
+              href="https://omg10.com/4/11383535"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-slate-950 hover:bg-slate-900 text-amber-300 font-black text-xs px-6 py-3.5 rounded-2xl flex items-center gap-2 shadow-md transition shrink-0 group"
+            >
+              <span>Visit Partner Deal</span>
+              <ExternalLink size={15} className="group-hover:translate-x-0.5 transition" />
+            </a>
+          </div>
+
+          {/* Direct Link to Leaderboard & Withdraw */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onClick={() => setActiveTab("leaderboard")}
+              className="bg-slate-900 text-white p-6 rounded-3xl border border-slate-800 text-left hover:bg-slate-800 transition flex items-center justify-between group cursor-pointer"
+            >
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 block mb-1">
+                  Top Earners Board
+                </span>
+                <h4 className="text-base font-black font-display flex items-center gap-2">
+                  <Trophy size={18} className="text-amber-400" />
+                  <span>View Leaderboard</span>
+                </h4>
+              </div>
+              <ChevronRight size={18} className="text-slate-400 group-hover:translate-x-1 transition" />
+            </button>
+
+            <button
+              onClick={() => setActiveTab("withdraw")}
+              className="bg-indigo-600 text-white p-6 rounded-3xl text-left hover:bg-indigo-700 transition flex items-center justify-between group shadow-lg shadow-indigo-600/10 cursor-pointer"
+            >
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-200 block mb-1">
+                  Cash Out Station
+                </span>
+                <h4 className="text-base font-black font-display flex items-center gap-2">
+                  <Gift size={18} className="text-amber-300" />
+                  <span>Withdraw Rewards</span>
+                </h4>
+              </div>
+              <ChevronRight size={18} className="text-indigo-200 group-hover:translate-x-1 transition" />
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      {/* LEADERBOARD TAB ZONE */}
+      {activeTab === "leaderboard" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-slate-950 p-6 sm:p-8 rounded-3xl shadow-xl">
+            <div className="flex items-center gap-3 mb-2">
+              <Trophy size={28} className="text-slate-950" />
+              <h2 className="text-2xl font-black font-display tracking-tight">Top Earners Leaderboard</h2>
+            </div>
+            <p className="text-xs text-slate-900 font-semibold max-w-xl">
+              Compete with other users to reach the top ranking! Rankings are updated live based on total coins earned.
+            </p>
+          </div>
+
+          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+            <div className="space-y-3">
+              {displayLeaderboard.map((item, index) => {
+                const isTop1 = index === 0;
+                const isTop2 = index === 1;
+                const isTop3 = index === 2;
+
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-4 rounded-2xl border transition ${
+                      isTop1
+                        ? "bg-amber-500/10 border-amber-300 text-slate-900"
+                        : isTop2
+                        ? "bg-slate-100/80 border-slate-300 text-slate-900"
+                        : isTop3
+                        ? "bg-orange-500/10 border-orange-300 text-slate-900"
+                        : "bg-slate-50 border-slate-100 text-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
+                        isTop1
+                          ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+                          : isTop2
+                          ? "bg-slate-300 text-slate-800"
+                          : isTop3
+                          ? "bg-orange-400 text-white"
+                          : "bg-slate-200 text-slate-600 font-mono"
+                      }`}>
+                        {index + 1}
+                      </div>
+
+                      <div>
+                        <h4 className="font-bold text-xs font-mono">{item.email}</h4>
+                        <span className="text-[10px] text-slate-400 font-semibold">Verified Earner</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="font-black text-sm text-slate-900 flex items-center gap-1 justify-end">
+                        <Coins size={14} className="text-amber-500" />
+                        <span>{item.coins.toLocaleString()} Coins</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-600 font-mono">
+                        Total Paid: {item.totalPaid || "₹50 INR"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WITHDRAW TAB ZONE */}
+      {activeTab === "withdraw" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
             <div className="flex items-center justify-between gap-4 mb-2">
-              <h3 className="text-base font-bold text-slate-900 font-display tracking-tight flex items-center gap-2">
-                <Gift size={18} className="text-indigo-600" />
-                <span>Withdrawal Station & Store</span>
-              </h3>
-              <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded">
-                Manual Payout Process
+              <h2 className="text-xl font-black text-slate-900 font-display tracking-tight flex items-center gap-2">
+                <Gift size={22} className="text-indigo-600" />
+                <span>Withdrawal Station</span>
+              </h2>
+              <span className="text-xs font-mono bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full border border-indigo-100 font-bold">
+                Manual Payout
               </span>
             </div>
             <p className="text-xs text-slate-500 mb-6">
-              Select an unlocked bundle below. Provide accurate payment coordinates to request your manual code code or cashback!
+              Exchange your earned coins for Google Play Gift Codes, Paytm Cash, or UPI transfers!
             </p>
 
-            {/* Error & Success Alerts */}
             {redeemError && (
               <div className="mb-4 p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl text-xs flex items-center gap-2">
                 <AlertCircle size={14} />
@@ -604,28 +762,28 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
               </div>
             )}
 
-            {/* Selected Package Action Panel */}
+            {/* Selected Package Form */}
             {selectedPackage ? (
-              <form onSubmit={handleRedeemSubmit} className="bg-indigo-50/40 p-5 rounded-2xl border border-indigo-100 mb-6 space-y-4 animate-fade-in">
+              <form onSubmit={handleRedeemSubmit} className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100 mb-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider">
-                      Selected Exchange Bundle
+                      Selected Package
                     </span>
-                    <h4 className="text-base font-black text-slate-900 mt-0.5">
-                      {selectedPackage.amount} INR Code
+                    <h4 className="text-lg font-black text-slate-900 mt-0.5">
+                      ₹{selectedPackage.amount} INR Reward Code / Cash
                     </h4>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-slate-400 block font-semibold">Coins Required</span>
-                    <span className="text-sm font-bold text-slate-950 font-mono bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-xl">
+                    <span className="text-sm font-bold text-slate-950 font-mono bg-white border border-indigo-100 px-3 py-1 rounded-xl">
                       {selectedPackage.coins} Coins
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
                     Your Paytm Number / UPI ID / PhonePe Number
                   </label>
                   <input
@@ -633,46 +791,46 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
                     value={paymentDetails}
                     onChange={(e) => setPaymentDetails(e.target.value)}
                     placeholder="e.g. Paytm: 9876543210 or UPI: gamersujeet@okaxis"
-                    className="w-full bg-white border border-indigo-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl px-4 py-2.5 text-xs outline-none text-slate-900 font-semibold"
+                    className="w-full bg-white border border-indigo-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl px-4 py-3 text-xs outline-none text-slate-900 font-bold"
                     required
                   />
-                  <span className="text-[10px] text-slate-400 mt-1.5 block leading-relaxed">
-                    Double-check your credentials! The admin processes payouts manually and uploads redeem code updates to your History column.
+                  <span className="text-[10px] text-slate-400 mt-1.5 block">
+                    Verify your payment details carefully before submitting!
                   </span>
                 </div>
 
-                <div className="flex items-center justify-end gap-2.5 pt-1">
+                <div className="flex items-center justify-end gap-2.5 pt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedPackage(null);
                       setPaymentDetails("");
                     }}
-                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition"
+                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold transition cursor-pointer"
                   >
-                    Cancel Selection
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submittingRedeem}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-md shadow-indigo-600/20 cursor-pointer"
                   >
-                    <Send size={12} />
-                    <span>{submittingRedeem ? "Submitting Request..." : "Submit Claim Request"}</span>
+                    <Send size={14} />
+                    <span>{submittingRedeem ? "Submitting..." : "Submit Withdrawal Request"}</span>
                   </button>
                 </div>
               </form>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {REDEEM_PACKAGES.map((pkg) => {
                   const canAfford = user.coins >= pkg.coins;
                   return (
                     <div 
                       key={pkg.amount} 
-                      className={`border rounded-2xl p-4 flex flex-col justify-between transition-all ${
+                      className={`border rounded-3xl p-5 flex flex-col justify-between transition-all ${
                         canAfford 
                           ? "border-emerald-200 bg-emerald-50/10 hover:border-emerald-500 hover:shadow-md cursor-pointer" 
-                          : "border-slate-100 bg-slate-50/30 opacity-75 hover:opacity-100"
+                          : "border-slate-100 bg-slate-50/50 opacity-80"
                       }`}
                       onClick={() => {
                         if (canAfford) {
@@ -684,129 +842,110 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className={`text-xs px-2.5 py-1 rounded-lg font-black ${
+                          <span className={`text-sm px-3 py-1 rounded-xl font-black ${
                             canAfford ? "bg-emerald-100 text-emerald-800" : "bg-indigo-50 text-indigo-700"
                           }`}>
-                            {pkg.amount} INR
+                            ₹{pkg.amount} INR
                           </span>
                           <span className="text-xs text-slate-600 font-mono font-bold">
-                            {pkg.coins} Coins
+                            {pkg.coins.toLocaleString()} Coins
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
-                          Google Play Gift Code or manual cash transfer.
+                        <p className="text-xs text-slate-500 mt-2 font-medium">
+                          Google Play Code, Paytm Cash, or instant UPI payout.
                         </p>
                       </div>
 
                       <button
                         type="button"
-                        className={`mt-4 w-full text-xs font-bold py-2 rounded-lg transition text-center ${
+                        className={`mt-5 w-full text-xs font-bold py-3 rounded-2xl transition text-center ${
                           canAfford
-                            ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/10"
                             : "bg-slate-100 text-slate-400 cursor-not-allowed"
                         }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (canAfford) {
-                            setSelectedPackage(pkg);
-                          } else {
-                            setRedeemError(`You need at least ${pkg.coins} coins to redeem ${pkg.amount} INR.`);
-                          }
-                        }}
                       >
-                        {canAfford ? "Request Withdrawal" : `Need ${pkg.coins - user.coins} more coins`}
+                        {canAfford ? "Withdraw Now" : `Need ${pkg.coins - user.coins} more coins`}
                       </button>
                     </div>
                   );
                 })}
               </div>
             )}
-
-            {/* Extra Ad unit under packages */}
-            <AdSenseUnit format="horizontal" responsive={true} slot="4567890123" />
-          </section>
-
-        </div>
-
-        {/* Column 3: History & Live Google Adsense display */}
-        <div className="space-y-8">
-          
-          {/* Real Google AdSense Banner (Sticky Sidebar aspect) */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm">
-            <p className="text-center text-[10px] text-indigo-600 font-bold mb-1 uppercase tracking-widest font-display">
-              Support Our Reserves Pool
-            </p>
-            <p className="text-center text-[10px] text-slate-400 mb-2 leading-relaxed">
-              Every display ad loaded or clicked directly funds our reserve, maintaining faster manual admin payouts!
-            </p>
-            <AdSenseUnit format="rectangle" responsive={true} slot="5678901234" />
           </div>
+        </div>
+      )}
 
-          {/* User Requests list */}
-          <section className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-900 font-display tracking-tight mb-4 flex items-center gap-2">
-              <CreditCard size={16} className="text-indigo-600" />
+      {/* HISTORY TAB ZONE */}
+      {activeTab === "history" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+            <h2 className="text-xl font-black text-slate-900 font-display tracking-tight mb-2 flex items-center gap-2">
+              <FileText size={22} className="text-indigo-600" />
               <span>Redemption History</span>
-            </h3>
+            </h2>
+            <p className="text-xs text-slate-500 mb-6">
+              Track your past withdrawal requests and view your processed Google Play codes!
+            </p>
 
             {requests.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-xs text-slate-400">No requests submitted yet.</p>
-                <p className="text-[10px] text-slate-400 mt-1">Accumulate coins and request cash codes above!</p>
+              <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                <Gift size={32} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-bold">No requests submitted yet.</p>
+                <p className="text-[11px] text-slate-400 mt-1">Accumulate coins in Home and submit a withdrawal request!</p>
               </div>
             ) : (
-              <div className="space-y-3.5 max-h-[450px] overflow-y-auto pr-1">
+              <div className="space-y-4">
                 {requests.map((req) => (
-                  <div key={req.id} className="border border-slate-100 rounded-2xl p-3.5 space-y-2 text-xs">
+                  <div key={req.id} className="border border-slate-100 rounded-2xl p-4 space-y-3 bg-slate-50/50">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800">
-                        {req.amount} INR Request
+                      <span className="font-black text-slate-900 text-sm">
+                        ₹{req.amount} INR Request
                       </span>
                       
                       {req.status === "pending" && (
-                        <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-md font-semibold">
-                          Pending Approval
+                        <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-bold">
+                          Pending Admin Approval
                         </span>
                       )}
                       {req.status === "completed" && (
-                        <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-md font-semibold">
-                          Paid Out
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold">
+                          Paid Out / Completed
                         </span>
                       )}
                       {req.status === "rejected" && (
-                        <span className="text-[10px] bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-md font-semibold">
-                          Rejected (Refunded)
+                        <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-full font-bold">
+                          Rejected (Coins Refunded)
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span>ID: {req.id}</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+                      <span>Request ID: {req.id}</span>
                       <span>{new Date(req.createdAt).toLocaleDateString()}</span>
                     </div>
 
-                    <p className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl">
-                      <strong className="text-slate-600">Details:</strong> {req.paymentDetails}
+                    <p className="text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-100">
+                      <strong>Target Details:</strong> {req.paymentDetails}
                     </p>
 
                     {req.status === "completed" && req.redeemCode && (
-                      <div className="mt-2.5 pt-2 border-t border-dashed border-slate-100 flex flex-col gap-1.5">
-                        <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                          Your Redeem Code:
+                      <div className="pt-2 border-t border-dashed border-slate-200 flex flex-col gap-1.5">
+                        <span className="text-[10px] text-emerald-700 font-black uppercase tracking-wider">
+                          Your Google Play Redeem Code:
                         </span>
-                        <div className="flex items-center justify-between bg-emerald-50/50 border border-emerald-100 rounded-xl p-2 font-mono text-[11px] text-emerald-800">
-                          <span className="font-bold select-all overflow-hidden truncate max-w-[150px]">
+                        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-3 font-mono text-xs text-emerald-900">
+                          <span className="font-bold select-all overflow-hidden truncate">
                             {req.redeemCode}
                           </span>
                           <button
                             onClick={() => handleCopyCode(req.redeemCode!, req.id)}
-                            className="text-emerald-600 hover:text-emerald-800 p-1 rounded-md hover:bg-emerald-100 transition"
+                            className="text-emerald-700 hover:text-emerald-900 p-1.5 rounded-lg hover:bg-emerald-100 transition shrink-0"
                             title="Copy Code"
                           >
                             {copiedId === req.id ? (
-                              <Check size={12} className="text-emerald-600" />
+                              <Check size={14} className="text-emerald-600" />
                             ) : (
-                              <Copy size={12} />
+                              <Copy size={14} />
                             )}
                           </button>
                         </div>
@@ -816,17 +955,70 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
                 ))}
               </div>
             )}
-          </section>
+          </div>
+        </div>
+      )}
+
+      {/* BOTTOM FIXED NAVIGATION BAR */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-t border-slate-200 py-2.5 px-4 shadow-lg">
+        <div className="max-w-md mx-auto flex items-center justify-around">
+          
+          <button
+            onClick={() => setActiveTab("home")}
+            className={`flex flex-col items-center gap-1 text-[11px] font-bold transition cursor-pointer ${
+              activeTab === "home" ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition ${activeTab === "home" ? "bg-indigo-50" : ""}`}>
+              <Home size={20} />
+            </div>
+            <span>Home</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("leaderboard")}
+            className={`flex flex-col items-center gap-1 text-[11px] font-bold transition cursor-pointer ${
+              activeTab === "leaderboard" ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition ${activeTab === "leaderboard" ? "bg-indigo-50" : ""}`}>
+              <Trophy size={20} />
+            </div>
+            <span>Leaderboard</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("withdraw")}
+            className={`flex flex-col items-center gap-1 text-[11px] font-bold transition cursor-pointer ${
+              activeTab === "withdraw" ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition ${activeTab === "withdraw" ? "bg-indigo-50" : ""}`}>
+              <Gift size={20} />
+            </div>
+            <span>Withdraw</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex flex-col items-center gap-1 text-[11px] font-bold transition cursor-pointer ${
+              activeTab === "history" ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition ${activeTab === "history" ? "bg-indigo-50" : ""}`}>
+              <FileText size={20} />
+            </div>
+            <span>History</span>
+          </button>
 
         </div>
+      </nav>
 
-      </div>
-
-      {/* Ad Simulator Modal Overlay */}
+      {/* Task Timer Modal */}
       <AdSimulator 
         isOpen={adModalOpen}
         onClose={() => setAdModalOpen(false)}
-        onReward={handleAdFinished}
+        onReward={handleTaskFinished}
         adType={adModalType}
       />
 
@@ -843,7 +1035,7 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
               </div>
               <button 
                 onClick={() => { setAdminLoginOpen(false); setAdminLoginError(null); }}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none p-1"
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none p-1 cursor-pointer"
               >
                 &times;
               </button>
@@ -867,7 +1059,7 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
                   placeholder="admin@gmail.com"
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
                 />
               </div>
 
@@ -881,21 +1073,22 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
                   placeholder="Enter administrator password"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition font-medium"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loggingInAdmin}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-xs py-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-xs py-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10 cursor-pointer"
               >
-                {loggingInAdmin ? "Authorizing Security..." : "Authorize & Enter Admin Panel"}
+                {loggingInAdmin ? "Authorizing..." : "Authorize & Enter Admin Panel"}
               </button>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }

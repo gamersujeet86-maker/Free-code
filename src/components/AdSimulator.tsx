@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, Volume2, VolumeX, Award, Clock, Sparkles, X, Gift, RefreshCw } from "lucide-react";
-import AdSenseUnit from "./AdSenseUnit";
+import { Clock, Sparkles, X, CheckCircle2, ArrowDown, ChevronDown, Award, ShieldCheck, ExternalLink } from "lucide-react";
 
 interface AdSimulatorProps {
   isOpen: boolean;
@@ -9,79 +8,35 @@ interface AdSimulatorProps {
   adType: "reward" | "booster";
 }
 
+const DIRECT_LINK_URL = "https://omg10.com/4/11383535";
+
 export default function AdSimulator({ isOpen, onClose, onReward, adType }: AdSimulatorProps) {
-  const [secondsLeft, setSecondsLeft] = useState(15);
-  const [isMuted, setIsMuted] = useState(true); // Default to muted for auto-play compatibility
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [adStep, setAdStep] = useState<"watching" | "completed">("watching");
-  const [selectedAdIndex, setSelectedAdIndex] = useState(0);
-  const [videoLoaded, setVideoLoaded] = useState(false);
-  const [videoError, setVideoError] = useState(false);
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const rewardClaimedRef = useRef(false);
-
-  const mockAds = [
-    {
-      title: "Clash of Coins: Ultimate Empire",
-      description: "Build your base, raid other earners, and multiply your daily payouts! Play for free today.",
-      color: "from-amber-600 to-red-700",
-      cta: "Install Now",
-      // High quality 15s gaming preview
-      videoUrl: "https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c054273b9e7c10cda2f28b29c4d9b265&profile_id=165&oauth2_token_id=57447761"
-    },
-    {
-      title: "FinTech Pro - Smart Budgeting & UPI",
-      description: "Earn cashback on every scan. Connect with verified merchants for 5% instant rewards.",
-      color: "from-blue-600 to-indigo-800",
-      cta: "Open App",
-      // High quality neon business/tech clip
-      videoUrl: "https://player.vimeo.com/external/434045526.sd.mp4?s=c27d2ad6cf79d2614c97aa35b9d0abcb7b5a5e38&profile_id=165&oauth2_token_id=57447761"
-    },
-    {
-      title: "QuizMaster: Trivia Royale",
-      description: "Solve 10 trivia puzzles to win instant Paytm gift vouchers. Over 2 Million users online!",
-      color: "from-purple-600 to-fuchsia-800",
-      cta: "Play Free",
-      // Fun motion graphics loop
-      videoUrl: "https://player.vimeo.com/external/454531102.sd.mp4?s=a2c91c3f9104043b4f693006001099661b171bf8&profile_id=165&oauth2_token_id=57447761"
-    },
-  ];
+  const [secondsLeft, setSecondsLeft] = useState(10);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    rewardClaimedRef.current = false;
-    setSecondsLeft(15);
-    setAdStep("watching");
-    setVideoLoaded(false);
-    setVideoError(false);
-    setIsPlaying(true);
-    // Pick a random mock ad
-    setSelectedAdIndex(Math.floor(Math.random() * mockAds.length));
+    setSecondsLeft(10);
+    setHasScrolledToBottom(false);
+    setRewardClaimed(false);
+
+    // Reset scroll position
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
   }, [isOpen]);
 
-  const handleClaimReward = () => {
-    if (!rewardClaimedRef.current) {
-      rewardClaimedRef.current = true;
-      onReward();
-    }
-  };
-
-  // Synchronize timer with video playback state
+  // 10-second countdown timer
   useEffect(() => {
-    if (!isOpen || adStep === "completed" || !isPlaying) return;
+    if (!isOpen || secondsLeft <= 0) return;
 
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setAdStep("completed");
-          if (videoRef.current) {
-            videoRef.current.pause();
-          }
-          // Automatically trigger reward credit as soon as ad finishes
-          handleClaimReward();
           return 0;
         }
         return prev - 1;
@@ -89,231 +44,203 @@ export default function AdSimulator({ isOpen, onClose, onReward, adType }: AdSim
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, adStep, isPlaying]);
+  }, [isOpen, secondsLeft]);
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      videoRef.current.play().catch((err) => console.log("Video playback play call blocked:", err));
-      setIsPlaying(true);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    // Check if user has scrolled near the bottom (within 30px)
+    if (scrollHeight - scrollTop - clientHeight < 30) {
+      setHasScrolledToBottom(true);
     }
   };
 
-  const handleVideoLoaded = () => {
-    setVideoLoaded(true);
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {
-        // Auto-play might be blocked unless muted
-        setIsMuted(true);
-        if (videoRef.current) {
-          videoRef.current.muted = true;
-          videoRef.current.play().catch(e => console.log("Auto-play fully blocked: ", e));
-        }
+  const handleScrollToBottom = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: "smooth",
       });
+      setHasScrolledToBottom(true);
     }
   };
 
-  const handleVideoError = () => {
-    console.warn("Video failed to stream, loading realistic interactive canvas fallback instead.");
-    setVideoError(true);
-    setVideoLoaded(true); // Treat as loaded so fallback UI displays
+  const handleClaimReward = () => {
+    if (secondsLeft > 0 || !hasScrolledToBottom || rewardClaimed) return;
+    setRewardClaimed(true);
+    
+    // Safely open direct link in new window
+    try {
+      window.open(DIRECT_LINK_URL, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      console.error("Could not open direct link:", e);
+    }
+
+    onReward();
   };
 
   if (!isOpen) return null;
 
-  const currentAd = mockAds[selectedAdIndex];
+  const canContinue = secondsLeft === 0 && hasScrolledToBottom;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 animate-fade-in">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-2xl flex flex-col max-h-[90vh]">
         
-        {/* Header with timer */}
-        <div className="bg-slate-900 px-5 py-4 flex items-center justify-between border-b border-slate-800/60">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-900 to-slate-900 px-6 py-4 flex items-center justify-between text-white border-b border-slate-800">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
-            </span>
-            <span className="text-xs font-bold text-slate-200 uppercase tracking-wider font-display">
-              {adType === "booster" ? "2X Earning Booster Video" : "Sponsor Rewarded Video"}
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-amber-400">
+              <Sparkles size={18} className="animate-spin" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black tracking-wide font-display">
+                {adType === "booster" ? "2x Coin Multiplier Task" : "Earn 10 Coins Task"}
+              </h3>
+              <p className="text-[11px] text-slate-300">
+                Complete 10s wait & scroll to continue
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Timer & Status Bar */}
+        <div className="bg-indigo-50/70 border-b border-indigo-100 px-6 py-3 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 font-mono font-bold text-indigo-950">
+            <Clock size={16} className={secondsLeft > 0 ? "text-indigo-600 animate-pulse" : "text-emerald-600"} />
+            <span>
+              {secondsLeft > 0 ? (
+                <>Timer: <strong className="text-indigo-600 text-sm">{secondsLeft}s</strong> remaining</>
+              ) : (
+                <span className="text-emerald-700 flex items-center gap-1 font-bold">
+                  <CheckCircle2 size={14} className="text-emerald-600" /> 10s Timer Completed!
+                </span>
+              )}
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Audio Toggle button */}
-            <button 
-              onClick={() => {
-                if (videoRef.current) {
-                  videoRef.current.muted = !isMuted;
-                  setIsMuted(!isMuted);
-                }
-              }} 
-              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-all active:scale-90"
-              title={isMuted ? "Unmute Video" : "Mute Video"}
-            >
-              {isMuted ? <VolumeX size={16} className="text-rose-400" /> : <Volume2 size={16} className="text-emerald-400" />}
-            </button>
-            
-            {adStep === "completed" ? (
-              <button 
-                onClick={onClose}
-                className="text-white bg-slate-800 hover:bg-rose-600 p-2 rounded-xl transition-all hover:scale-105 active:scale-95"
-              >
-                <X size={16} />
-              </button>
+          <div className="text-[11px] font-semibold text-slate-500">
+            {hasScrolledToBottom ? (
+              <span className="text-emerald-600 font-bold flex items-center gap-1">
+                <CheckCircle2 size={13} /> Scrolled to bottom
+              </span>
             ) : (
-              <div className="flex items-center gap-1.5 bg-slate-950/80 px-3.5 py-1.5 rounded-full border border-slate-800 text-amber-400 text-xs font-mono">
-                <Clock size={12} className="animate-spin text-amber-400" />
-                <span>{secondsLeft}s remaining</span>
-              </div>
+              <span className="text-amber-600 font-bold flex items-center gap-1 animate-pulse">
+                <ArrowDown size={13} /> Scroll down required
+              </span>
             )}
           </div>
         </div>
 
-        {/* Top Seek Progress bar */}
-        <div className="w-full bg-slate-950 h-1">
-          <div 
-            className="bg-gradient-to-r from-amber-400 via-yellow-400 to-emerald-400 h-full transition-all duration-1000 ease-linear"
-            style={{ width: `${((15 - secondsLeft) / 15) * 100}%` }}
-          />
+        {/* Scrollable Content Body */}
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="p-6 overflow-y-auto space-y-4 max-h-[360px] text-slate-700 text-xs leading-relaxed font-sans bg-slate-50/50"
+        >
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
+              <ShieldCheck size={18} />
+              <span>Verified Coin Earning Protocol</span>
+            </div>
+            <p className="text-slate-600">
+              Welcome to the Fast Earn task zone. You are just a few seconds away from receiving your <strong>10 reward coins</strong> directly into your balance!
+            </p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+            <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+              📌 Simple Rules for Claiming Rewards
+            </h4>
+            <ul className="space-y-2 text-slate-600 list-disc list-inside">
+              <li>Wait for the <strong>10-second timer</strong> above to reach 0.</li>
+              <li>Scroll down to the bottom of this text container.</li>
+              <li>Click the green <strong>"Continue & Claim Coins"</strong> button below.</li>
+              <li>Your coins will be instantly credited and updated in your balance!</li>
+            </ul>
+          </div>
+
+          <div className="bg-gradient-to-r from-amber-50 to-indigo-50 border border-amber-200 p-4 rounded-2xl shadow-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-md uppercase tracking-wide">
+                Special Sponsor
+              </span>
+              <a
+                href={DIRECT_LINK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 underline"
+              >
+                <span>Visit Partner Link</span>
+                <ExternalLink size={12} />
+              </a>
+            </div>
+            <p className="text-slate-700 font-medium">
+              Click the partner offer link above to check out special bonus deals from our verified sponsor!
+            </p>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+            <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+              🎁 Redemption & Gift Code Info
+            </h4>
+            <p className="text-slate-600">
+              Accumulate coins to unlock ₹10, ₹20, ₹50, and ₹100 Google Play gift codes, Paytm Cash, and UPI transfers. Submit your phone number or UPI ID in the Withdrawal tab for manual payout verification!
+            </p>
+          </div>
+
+          {/* Bottom marker for scrolling */}
+          <div className="pt-4 border-t border-slate-200 text-center text-slate-400 font-medium text-[11px]">
+            --- You have reached the bottom! ---
+          </div>
         </div>
 
-        {/* Video Frame */}
-        <div className="relative flex-1 flex flex-col justify-between min-h-[340px] bg-black">
-          {adStep === "watching" ? (
-            <div className="absolute inset-0 flex flex-col justify-between overflow-hidden">
-              
-              {/* Spinner while loading */}
-              {!videoLoaded && (
-                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950 text-slate-400">
-                  <RefreshCw className="animate-spin text-indigo-500 mb-3" size={32} />
-                  <span className="text-xs font-semibold tracking-wider uppercase font-display">Streaming Advertisement Video...</span>
-                </div>
-              )}
-
-              {/* Dynamic HTML5 Video Player */}
-              {!videoError ? (
-                <video
-                  ref={videoRef}
-                  src={currentAd.videoUrl}
-                  className="w-full h-full object-cover"
-                  autoPlay
-                  playsInline
-                  muted={isMuted}
-                  onLoadedData={handleVideoLoaded}
-                  onError={handleVideoError}
-                />
-              ) : (
-                // Beautiful dynamic backup canvas animation if streaming video gets blocked by CORS or sandbox
-                <div className={`absolute inset-0 bg-gradient-to-br ${currentAd.color} flex flex-col items-center justify-center p-6 text-center text-white relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent animate-pulse" />
-                  <Sparkles size={48} className="text-amber-300 animate-bounce mb-4" />
-                  <h3 className="text-lg font-bold font-display tracking-tight leading-snug">{currentAd.title}</h3>
-                  <p className="text-xs text-white/80 mt-2 max-w-xs">{currentAd.description}</p>
-                </div>
-              )}
-
-              {/* Dark overlay gradients for player aesthetics */}
-              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10" />
-              <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none z-10" />
-
-              {/* Real-time Video Controls overlay */}
-              <div className="absolute inset-0 z-20 flex flex-col justify-between p-4">
-                
-                {/* Top Badge Info */}
-                <div className="flex items-center justify-between">
-                  <span className="bg-amber-500/90 text-[10px] text-slate-950 px-2.5 py-1 rounded-full uppercase tracking-wider font-extrabold shadow-sm font-display">
-                    Sponsor Partner
-                  </span>
-                  <span className="text-[10px] text-white/80 font-mono bg-black/40 px-2 py-0.5 rounded-full">
-                    HD Premium ad
-                  </span>
-                </div>
-
-                {/* Bottom Bar Info & Play Button */}
-                <div className="space-y-2">
-                  <div className="flex items-end justify-between gap-4">
-                    <div className="flex-1">
-                      <h4 className="text-white text-base font-bold font-display tracking-tight leading-tight mb-1 drop-shadow-md">
-                        {currentAd.title}
-                      </h4>
-                      <p className="text-white/80 text-[11px] line-clamp-2 leading-relaxed drop-shadow">
-                        {currentAd.description}
-                      </p>
-                    </div>
-
-                    {/* Interactive Play/Pause controller */}
-                    <button
-                      onClick={togglePlay}
-                      className="bg-white hover:bg-slate-100 text-slate-900 p-3 rounded-2xl shadow-lg transition transform hover:scale-105 active:scale-95 shrink-0"
-                    >
-                      {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1 text-[10px] text-white/60 font-mono">
-                    <span>Watching: {15 - secondsLeft}s</span>
-                    <span className="text-amber-400 font-bold tracking-widest animate-pulse">DON'T CLOSE</span>
-                    <span>Total: 15s</span>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-900">
-              <div className="w-16 h-16 rounded-full bg-emerald-950 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-bounce">
-                <Award className="text-emerald-400" size={32} />
-              </div>
-              
-              <h3 className="text-white text-xl font-bold font-display tracking-tight">
-                Video Completed Successfully!
-              </h3>
-              
-              <p className="text-slate-400 text-xs mt-1.5 max-w-sm leading-relaxed">
-                Thank you! Your active video view is successfully attributed to publisher <strong>pub-9048277633959630</strong>. Payout reserves have been updated.
-              </p>
-
-              <div className="mt-6 w-full bg-slate-950 border border-slate-800/80 p-5 rounded-2xl flex items-center justify-between">
-                <div className="text-left">
-                  <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider font-display">
-                    Coin Prize Generated
-                  </p>
-                  <p className="text-sm font-bold text-white mt-0.5">
-                    {adType === "booster" ? "2x Coin Multiplier (15m)" : "+10 Premium Coins"}
-                  </p>
-                </div>
-                <button
-                  onClick={onReward}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-emerald-950/20 transition transform hover:scale-105 active:scale-95"
-                >
-                  Claim Reward
-                </button>
-              </div>
-            </div>
+        {/* Action Footer */}
+        <div className="p-5 bg-white border-t border-slate-100 flex flex-col gap-2.5">
+          {!hasScrolledToBottom && (
+            <button
+              onClick={handleScrollToBottom}
+              className="w-full text-xs text-indigo-600 hover:text-indigo-800 font-bold py-1.5 flex items-center justify-center gap-1 transition"
+            >
+              <span>Jump / Scroll to bottom</span>
+              <ChevronDown size={14} className="animate-bounce" />
+            </button>
           )}
+
+          <button
+            onClick={handleClaimReward}
+            disabled={!canContinue || rewardClaimed}
+            className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg ${
+              canContinue
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+            }`}
+          >
+            {canContinue ? (
+              <>
+                <Award size={18} />
+                <span>Continue & Claim {adType === "booster" ? "2x Booster Multiplier" : "10 Coins"}</span>
+              </>
+            ) : secondsLeft > 0 ? (
+              <>
+                <Clock size={16} className="animate-spin" />
+                <span>Please wait {secondsLeft}s...</span>
+              </>
+            ) : (
+              <>
+                <ArrowDown size={16} className="animate-bounce" />
+                <span>Scroll down to bottom to Continue</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Embedded AdSense display frame to fulfill live adsense view during interaction */}
-        <div className="bg-slate-950/50 p-4 border-t border-slate-800/60">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider font-display">Google AdSense Partner Frame</span>
-            <span className="text-[9px] text-slate-600 font-mono">ID: pub-9048277633959630</span>
-          </div>
-          {/* Minimum slot AdSense banner */}
-          <div className="opacity-95">
-            <AdSenseUnit format="horizontal" responsive={true} slot="8901234567" />
-          </div>
-        </div>
-
-        {/* Bottom Banner Info */}
-        <div className="bg-slate-950 px-4 py-3 text-[10px] text-slate-500 text-center border-t border-slate-800">
-          This system uses valid AdSense publisher tags. Payouts require genuine traffic compliance.
-        </div>
       </div>
     </div>
   );
