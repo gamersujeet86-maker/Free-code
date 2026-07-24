@@ -67,14 +67,6 @@ export default function AdSimulator({ isOpen, onClose, onReward, adType }: AdSim
   const handleClaimReward = () => {
     if (secondsLeft > 0 || !hasScrolledToBottom || rewardClaimed) return;
     setRewardClaimed(true);
-    
-    // Safely open direct link in new window
-    try {
-      window.open(DIRECT_LINK_URL, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      console.error("Could not open direct link:", e);
-    }
-
     onReward();
   };
 
