@@ -18,13 +18,24 @@ export default function App() {
       const savedUser = localStorage.getItem("redeem_app_user");
 
       if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUserProfile(JSON.parse(savedUser));
-        setLoading(false);
-        return;
+        try {
+          const parsed = JSON.parse(savedUser);
+          const now = Date.now();
+          const isBoosterActive = parsed.boosterUntil ? parsed.boosterUntil > now : false;
+          setUserProfile({
+            ...parsed,
+            isBoosterActive,
+            boosterTimeRemaining: isBoosterActive ? Math.max(0, parsed.boosterUntil - now) : 0,
+          });
+          setToken(savedToken);
+          setLoading(false);
+          return;
+        } catch (e) {
+          console.error("Error parsing saved user:", e);
+        }
       }
 
-      // No saved token, or we need to fetch/create an auto-login session
+      // Try auto-login API with fallback to local guest session on static hosts like Vercel
       try {
         const response = await fetch("/api/auth/auto-login", {
           method: "POST",
@@ -34,7 +45,8 @@ export default function App() {
           body: JSON.stringify({ token: savedToken }),
         });
 
-        if (response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (response.ok && contentType && contentType.includes("application/json")) {
           const data = await response.json();
           localStorage.setItem("redeem_app_token", data.token);
           const initialProfile: UserProfile = {
@@ -45,46 +57,88 @@ export default function App() {
           localStorage.setItem("redeem_app_user", JSON.stringify(initialProfile));
           setToken(data.token);
           setUserProfile(initialProfile);
-        } else {
-          console.error("Auto-login returned non-ok status");
+          setLoading(false);
+          return;
         }
       } catch (err) {
-        console.error("Connection failed during automatic login:", err);
-      } finally {
-        setLoading(false);
+        console.warn("Backend auto-login unavailable, initializing local session:", err);
       }
+
+      // Fallback local guest session for Vercel static deploys or offline servers
+      const guestId = Math.random().toString(36).substring(2, 10);
+      const fallbackUser: UserProfile = {
+        id: `user_${guestId}`,
+        email: `earner_${guestId}@gmail.com`,
+        isAdmin: false,
+        coins: 0,
+        boosterUntil: null,
+        isBoosterActive: false,
+        boosterTimeRemaining: 0,
+      };
+      localStorage.setItem("redeem_app_token", `token_${guestId}`);
+      localStorage.setItem("redeem_app_user", JSON.stringify(fallbackUser));
+      setToken(`token_${guestId}`);
+      setUserProfile(fallbackUser);
+      setLoading(false);
     };
 
     initSession();
   }, []);
 
-  // Fetch updated user profile & requests from backend
+  // Fetch updated user profile & requests from backend with local fallback
   const fetchProfileData = useCallback(async () => {
-    if (!token) return;
+    let synced = false;
 
-    try {
-      const response = await fetch("/api/user/profile", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    if (token) {
+      try {
+        const response = await fetch("/api/user/profile", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      if (response.ok) {
         const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
+        if (response.ok && contentType && contentType.includes("application/json")) {
           const data = await response.json();
           setUserProfile(data.user);
-          setRequests(data.requests);
+          setRequests(data.requests || []);
           localStorage.setItem("redeem_app_user", JSON.stringify(data.user));
-        } else {
-          console.warn("Profile sync returned non-JSON response");
+          if (data.requests) {
+            localStorage.setItem("redeem_app_requests", JSON.stringify(data.requests));
+          }
+          synced = true;
         }
-      } else {
-        // If profile fetch fails (e.g., unauthorized/deleted), do auto-login reset
-        handleLogout();
+      } catch (error) {
+        console.warn("Backend profile sync unavailable, reading from local state:", error);
       }
-    } catch (error) {
-      console.error("Error synchronizing profile details:", error);
+    }
+
+    // Local fallback when backend API is unavailable (e.g. Vercel static hosting)
+    if (!synced) {
+      const localUserRaw = localStorage.getItem("redeem_app_user");
+      if (localUserRaw) {
+        try {
+          const parsed = JSON.parse(localUserRaw);
+          const now = Date.now();
+          const isBoosterActive = parsed.boosterUntil ? parsed.boosterUntil > now : false;
+          setUserProfile({
+            ...parsed,
+            isBoosterActive,
+            boosterTimeRemaining: isBoosterActive ? Math.max(0, parsed.boosterUntil - now) : 0,
+          });
+        } catch (e) {
+          console.error("Failed to parse local user profile:", e);
+        }
+      }
+
+      const localReqsRaw = localStorage.getItem("redeem_app_requests");
+      if (localReqsRaw) {
+        try {
+          setRequests(JSON.parse(localReqsRaw));
+        } catch (e) {
+          console.error("Failed to parse local requests:", e);
+        }
+      }
     }
   }, [token]);
 
