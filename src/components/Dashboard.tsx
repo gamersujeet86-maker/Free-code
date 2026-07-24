@@ -42,6 +42,7 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
   const [submittingRedeem, setSubmittingRedeem] = useState(false);
   const [redeemError, setRedeemError] = useState<string | null>(null);
   const [redeemSuccess, setRedeemSuccess] = useState<string | null>(null);
+  const [rewardToast, setRewardToast] = useState<string | null>(null);
 
   // Admin login states
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
@@ -116,6 +117,14 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
       }
 
       if (response.ok) {
+        if (adModalType === "reward") {
+          const earned = data.earned || (user.isBoosterActive ? 20 : 10);
+          const newCoins = data.newCoins ?? (user.coins + earned);
+          setRewardToast(`🎉 +${earned} Coins credited! New balance: ${newCoins.toLocaleString()} coins.`);
+        } else {
+          setRewardToast("🚀 2X Coin Booster activated! You now earn double coins for 15 minutes.");
+        }
+        setTimeout(() => setRewardToast(null), 6000);
         onRefresh();
       } else {
         alert(data.error || "Failed to sync rewards. Please try again.");
@@ -240,6 +249,22 @@ export default function Dashboard({ token, user, requests, onRefresh, onLogout, 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 font-sans">
       
+      {/* Toast Notification Banner */}
+      {rewardToast && (
+        <div className="mb-6 p-4 bg-emerald-500 text-white rounded-2xl shadow-lg border border-emerald-400 flex items-center justify-between animate-in fade-in slide-in-from-top-3 duration-300">
+          <div className="flex items-center gap-3">
+            <Sparkles size={20} className="animate-spin text-amber-200 shrink-0" />
+            <span className="text-xs sm:text-sm font-black font-display tracking-wide">{rewardToast}</span>
+          </div>
+          <button 
+            onClick={() => setRewardToast(null)} 
+            className="text-emerald-100 hover:text-white p-1 rounded-lg hover:bg-emerald-600 transition"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Navigation Top Bar */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-8">
         <div className="flex items-center gap-3">

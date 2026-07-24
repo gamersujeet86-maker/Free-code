@@ -19,6 +19,7 @@ export default function AdSimulator({ isOpen, onClose, onReward, adType }: AdSim
   const [videoError, setVideoError] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const rewardClaimedRef = useRef(false);
 
   const mockAds = [
     {
@@ -50,6 +51,7 @@ export default function AdSimulator({ isOpen, onClose, onReward, adType }: AdSim
   useEffect(() => {
     if (!isOpen) return;
 
+    rewardClaimedRef.current = false;
     setSecondsLeft(15);
     setAdStep("watching");
     setVideoLoaded(false);
@@ -58,6 +60,13 @@ export default function AdSimulator({ isOpen, onClose, onReward, adType }: AdSim
     // Pick a random mock ad
     setSelectedAdIndex(Math.floor(Math.random() * mockAds.length));
   }, [isOpen]);
+
+  const handleClaimReward = () => {
+    if (!rewardClaimedRef.current) {
+      rewardClaimedRef.current = true;
+      onReward();
+    }
+  };
 
   // Synchronize timer with video playback state
   useEffect(() => {
@@ -71,6 +80,8 @@ export default function AdSimulator({ isOpen, onClose, onReward, adType }: AdSim
           if (videoRef.current) {
             videoRef.current.pause();
           }
+          // Automatically trigger reward credit as soon as ad finishes
+          handleClaimReward();
           return 0;
         }
         return prev - 1;

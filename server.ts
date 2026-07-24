@@ -120,12 +120,26 @@ async function startServer() {
     const db = loadDb();
     let user: User | null = null;
 
-    if (email) {
-      user = db.users[email.toLowerCase().trim()];
-    }
+    if (email && email.trim()) {
+      const normalizedEmail = email.toLowerCase().trim();
+      user = db.users[normalizedEmail];
 
-    if (!user) {
-      // Silently and instantly create a fresh user on-the-fly to remove any authorization barrier
+      if (!user) {
+        // Guarantee account persistence using the provided user email or token
+        user = {
+          id: Math.random().toString(36).substring(2, 11),
+          email: normalizedEmail,
+          passwordHash: `anon-${normalizedEmail}`,
+          isAdmin: normalizedEmail === "admin@gmail.com",
+          coins: 0,
+          boosterUntil: null,
+          createdAt: new Date().toISOString(),
+        };
+        db.users[normalizedEmail] = user;
+        saveDb(db);
+      }
+    } else {
+      // Create a fresh persistent anonymous user
       const id = Math.random().toString(36).substring(2, 11);
       const anonymousEmail = `user_${id}@earner.com`;
       user = {
@@ -140,7 +154,6 @@ async function startServer() {
       db.users[anonymousEmail] = user;
       saveDb(db);
 
-      // Set cookie so they stay logged into this dynamic anonymous profile
       res.setHeader(
         "Set-Cookie",
         `earn_token=${user.email}; Path=/; Max-Age=${365 * 24 * 60 * 60}; SameSite=Lax; HttpOnly`
@@ -274,12 +287,24 @@ async function startServer() {
     
     let user: User | null = null;
     
-    if (email) {
+    if (email && email.trim()) {
       const normalizedEmail = email.toLowerCase().trim();
       user = db.users[normalizedEmail] || null;
-    }
-    
-    if (!user) {
+
+      if (!user) {
+        user = {
+          id: Math.random().toString(36).substring(2, 11),
+          email: normalizedEmail,
+          passwordHash: `anon-${normalizedEmail}`,
+          isAdmin: normalizedEmail === "admin@gmail.com",
+          coins: 0,
+          boosterUntil: null,
+          createdAt: new Date().toISOString(),
+        };
+        db.users[normalizedEmail] = user;
+        saveDb(db);
+      }
+    } else {
       // Create fresh anonymous user
       const id = Math.random().toString(36).substring(2, 11);
       const anonymousEmail = `user_${id}@earner.com`;
